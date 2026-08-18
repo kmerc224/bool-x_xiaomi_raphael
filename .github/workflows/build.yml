@@ -1,0 +1,84 @@
+name: 完整安卓内核编译流程
+
+on:
+  workflow_dispatch:
+
+# 环境变量集中配置区 —— 重要部分请在这里修改！
+jobs:
+  build:
+    name: 编译内核镜像
+    runs-on: ubuntu-22.04  # 推荐22.04，兼容性最好
+
+    steps:
+      # 1. 安装基础依赖 (完整编译环境)
+      - name: 安装编译依赖
+        run: |
+          sudo apt-get update
+          sudo apt install -y bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf imagemagick lib32ncurses5-dev lib32readline-dev lib32z1-dev liblz4-tool libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev unzip openjdk-8-jdk language-pack-zh-hans python2 python3 cpio p7zip-full
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+          sudo apt-get install -y gcc-arm*
+          
+      # 2. 下载并解压 Clang 工具链（带 binutils）
+      - name: 下载 Clang
+        run: |
+          mkdir -p $HOME/toolchain/clang
+          cd $HOME/toolchain/clang
+          wget https://github.com/Mandi-Sa/clang/releases/download/amd64-kernel-arm_static-19/llvm19.0.0-binutils2.42_amd64-kernel-arm_static-20240425.7z
+          7z x llvm19.0.0-binutils2.42_amd64-kernel-arm_static-20240425.7z
+          rm -rf llvm19.0.0-binutils2.42_amd64-kernel-arm_static-20240425.7z
+          
+      # 3. 检出内核源码 (此处可替换为自己的源码)
+      - name: 检出内核源码
+        run: |
+          cd $HOME
+          git clone --depth=1 -b 16-HyperMiui https://github.com/kmerc224/bool-x_xiaomi_raphael.git
+
+      # 4. 设置编译环境变量 并 开始编译
+      - name: 编译内核
+        run: |
+          cd $HOME/bool-x_xiaomi_raphael
+          export CC=clang
+          export ARCH=arm64
+          export PATH="$HOME/toolchain/clang/bin:$PATH"
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+          
+          make O=out raphael_defconfig
+          make O=out -j8
+          
+# 6. 打包整个 out 文件夹（压缩为 tar.gz）
+      - name: 打包产物
+        run: |
+          cd $HOME/bool-x_xiaomi_raphael
+          mkdir -p $HOME/output
+          mv out/arch/arm64/boot/Image.gz $HOME/output
+          mv out/arch/arm64/boot/Image $HOME/output
+          mv out/arch/arm64/boot/dtbo.img $HOME/output
+          mv out/arch/arm64/boot/Image.gz-dtb $HOME/output
+          tar -czvf $GITHUB_WORKSPACE/out.tar.gz $HOME/output/
+          echo "打包完成，文件大小："
+          ls -lh $GITHUB_WORKSPACE/out.tar.gz
+
+# 7. 发布到 Release（上传 out.tar.gz）
+      - name: 发布到 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || format('build-{0}', github.run_number) }}
+          name: 内核编译产物
+          body: |
+            完整的 out/ 编译输出目录（已打包）。
+            下载后使用 `tar -xzf out.tar.gz` 解压即可得到完整的 output/ 文件夹。
+          files: out.tar.gz
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+# 8. （可选）备选：上传到 Actions Artifacts
+      - name: 上传编译产物（备选）
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-build-out
+          path: out.tar.gz
+          retention-days: 7
