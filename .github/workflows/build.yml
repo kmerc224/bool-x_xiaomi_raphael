@@ -54,6 +54,7 @@ jobs:
           cd dts
           ls
           mkdir -p $HOME/output
+          cd $HOME/bool-x_xiaomi_raphael
           cp out/arch/arm64/boot/Image.gz $HOME/output
           cp out/arch/arm64/boot/Image $HOME/output
           cp out/arch/arm64/boot/Image.gz-dtb $HOME/output
