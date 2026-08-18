@@ -49,7 +49,8 @@ jobs:
 # 6. 打包整个 out 文件夹（压缩为 tar.gz）
       - name: 打包产物
         run: |
-          cd $HOME/bool-x_xiaomi_raphael
+          cd $HOME/bool-x_xiaomi_raphael/out/arch/arm64/boot/
+          ls
           mkdir -p $HOME/output
           mv out/arch/arm64/boot/Image.gz $HOME/output
           mv out/arch/arm64/boot/Image $HOME/output
