@@ -51,6 +51,8 @@ jobs:
         run: |
           cd $HOME/bool-x_xiaomi_raphael/out/arch/arm64/boot/
           ls
+          cd dts
+          ls
           mkdir -p $HOME/output
           mv out/arch/arm64/boot/Image.gz $HOME/output
           mv out/arch/arm64/boot/Image $HOME/output
