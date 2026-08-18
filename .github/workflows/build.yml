@@ -56,7 +56,6 @@ jobs:
           mkdir -p $HOME/output
           mv out/arch/arm64/boot/Image.gz $HOME/output
           mv out/arch/arm64/boot/Image $HOME/output
-          mv out/arch/arm64/boot/dtbo.img $HOME/output
           mv out/arch/arm64/boot/Image.gz-dtb $HOME/output
           tar -czvf $GITHUB_WORKSPACE/out.tar.gz $HOME/output/
           echo "打包完成，文件大小："
