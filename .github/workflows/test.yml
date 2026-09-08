@@ -1,82 +1,122 @@
-name: 完整安卓内核编译流程
+name: Build K40 Kernel
 
 on:
   workflow_dispatch:
+    inputs:
+      ksu:
+        description: '添加KSU支持'
+        required: false
+        default: 'true'
+      config_path:
+        description: '内核配置文件路径（如果不需要KSU则忽略）/一般默认即可'
+        required: false
+        type: string
+        default: 'arch/arm64/configs/'
+      kernel_tag:
+        description: '内核代码分支/Tag'
+        required: false
+        type: string
+        default: 'master'
+      config_name:
+        description: '内核编译配置文件名'
+        required: false
+        type: string
+        default: 'alioth_hylab_defconfig'
+      git_url:
+        description: '内核仓库地址'
+        required: false
+        type: string
+        default: 'https://github.com/zfdx123/kernel_xiaomi_alioth.git'
+      clang_url:
+        description: '编译器下载地址'
+        required: false
+        type: string
+        default: 'https://github.com/XSans0/WeebX-Clang/releases/download/WeebX-Clang-19.1.5-release/WeebX-Clang-19.1.5.tar.gz'
 
-# 环境变量集中配置区 —— 重要部分请在这里修改！
 jobs:
-  build:
-    name: 编译内核镜像
-    runs-on: ubuntu-22.04  # 推荐22.04，兼容性最好
+
+  build_kernel:
+
+    name: Build K40 Kernel
+
+    runs-on: ubuntu-22.04
 
     steps:
-      # 1. 安装基础依赖 (完整编译环境)
-      - name: 安装编译依赖
-        run: |
-          sudo apt-get update
-          sudo apt install -y bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf imagemagick lib32ncurses5-dev lib32readline-dev lib32z1-dev liblz4-tool libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev unzip openjdk-8-jdk language-pack-zh-hans python2 python3 cpio p7zip-full
-          sudo apt-get install -y gcc-aarch64-linux-gnu
-          sudo apt-get install -y gcc-arm*
-          
-      # 2. 下载并解压 Clang 工具链（带 binutils）
-      - name: 下载 Clang
-        run: |
-          mkdir -p $HOME/toolchain/clang
-          cd $HOME/toolchain/clang
-          wget https://github.com/Mandi-Sa/clang/releases/download/amd64-kernel-arm_static-19/llvm19.0.0-binutils2.42_amd64-kernel-arm_static-20240425.7z
-          7z x llvm19.0.0-binutils2.42_amd64-kernel-arm_static-20240425.7z
-          rm -rf llvm19.0.0-binutils2.42_amd64-kernel-arm_static-20240425.7z
-          
-      # 3. 检出内核源码 (此处可替换为自己的源码)
-      - name: 检出内核源码
-        run: |
-          cd $HOME
-          git clone --depth=1 https://github.com/MiCode/Xiaomi_Kernel_OpenSource -b alioth-r-oss
 
-      # 4. 设置编译环境变量 并 开始编译
-      - name: 编译内核
-        run: |
-          cd $HOME/Xiaomi_Kernel_OpenSource
-          export CC=clang
-          export ARCH=arm64
-          export PATH="$HOME/toolchain/clang/bin:$PATH"
-          export CROSS_COMPILE=aarch64-linux-gnu-
-          make O=out alioth_user_defconfig
-          make O=out -j8
-          
-# 6. 打包整个 out 文件夹（压缩为 tar.gz）
-      - name: 打包产物
-        run: |
-          cd $HOME/Xiaomi_Kernel_OpenSource
-          mkdir -p $HOME/output
-          mv out/arch/arm64/boot/Image.gz $HOME/output
-          mv out/arch/arm64/boot/Image $HOME/output
-          mv out/arch/arm64/boot/dtbo.img $HOME/output
-          mv out/arch/arm64/boot/Image.gz-dtb $HOME/output
-          tar -czvf $GITHUB_WORKSPACE/out.tar.gz $HOME/output/
-          echo "打包完成，文件大小："
-          ls -lh $GITHUB_WORKSPACE/out.tar.gz
-
-# 7. 发布到 Release（上传 out.tar.gz）
-      - name: 发布到 Release
-        uses: softprops/action-gh-release@v2
+      - name: Checkout
+        uses: actions/checkout@main
         with:
-          tag_name: ${{ github.event.inputs.release_tag || format('build-{0}', github.run_number) }}
-          name: 内核编译产物
-          body: |
-            完整的 out/ 编译输出目录（已打包）。
-            下载后使用 `tar -xzf out.tar.gz` 解压即可得到完整的 output/ 文件夹。
-          files: out.tar.gz
-          draft: false
-          prerelease: false
+          ref: master
+          fetch-depth: 0
+
+      - name: Initialization environment
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          sudo -E apt-get -qq update
+          # sudo -E apt-get -qq install build-essential asciidoc binutils bzip2 gawk gettext git libncurses5-dev libz-dev patch python3 python2.7 unzip zlib1g-dev lib32gcc1-s1 libc6-dev-i386 subversion flex uglifyjs git-core gcc-multilib p7zip p7zip-full msmtp libssl-dev texinfo libglib2.0-dev xmlto qemu-utils upx libelf-dev autoconf automake libtool autopoint device-tree-compiler g++-multilib antlr3 gperf wget curl swig rsync
+          sudo -E apt-get -qq install -y bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf imagemagick lib32readline-dev lib32z1-dev liblz4-tool libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev libc6-dev-i386 libncurses6 libncursesw6 lib32ncurses-dev lib32ncurses6 lib32ncursesw6 libncurses5-dev x11proto-core-dev libx11-dev libgl1-mesa-dev unzip fontconfig make python2
+          sudo -E apt-get -qq install libfuse-dev
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -qq clean
+          sudo timedatectl set-timezone Asia/Shanghai
 
-# 8. （可选）备选：上传到 Actions Artifacts
-      - name: 上传编译产物（备选）
-        uses: actions/upload-artifact@v4
+      - name: Init Config
+        id: init_config
+        run: |
+          processed_name=$(echo ${{ inputs.config_name }} | awk -F'/' '{ if (NF > 1) print $NF; else print $0 }')
+          echo "processed_name=$(echo $processed_name)" >> $GITHUB_OUTPUT
+
+      - name: Install Clang
+        run: |
+          mkdir clang
+          wget ${{ inputs.clang_url }}
+          tar -C clang/ -zxvf *.tar.gz
+      
+      - name: Clone Kernel
+        run: |
+          git clone --depth=1 -b ${{ inputs.kernel_tag }} ${{ inputs.git_url }} kernel-source
+          
+      - name: Support KernelSU
+        if: github.event.inputs.ksu == 'true'
+        run: |
+          git clone https://github.com/ReSukiSU/ReSukiSU kernel-source/KernelSU
+          cd kernel-source
+          echo "CONFIG_KPROBES=y" >> ${{ inputs.config_path }}${{ inputs.config_name }}
+          echo "CONFIG_HAVE_KPROBES=y" >> ${{ inputs.config_path }}${{ inputs.config_name }}
+          echo "CONFIG_KPROBE_EVENTS=y" >> ${{ inputs.config_path }}${{ inputs.config_name }}
+          git config --global user.email "robot@example.com"
+          git config --global user.name "robot"
+          git add ${{ inputs.config_path }}${{ inputs.config_name }}
+          git commit -m "KUS"
+          sh ./KernelSU/kernel/setup.sh
+
+      - name: Make
+        run: |
+          export ClangHome=$(pwd)/clang
+          export PATH=${ClangHome}/bin:${PATH}
+          cd kernel-source
+          make LLVM=1 LLVM_IAS=1 O=out ARCH=arm64 SUBARCH=arm64 CC=clang LD=ld.lld ${{ inputs.config_name }}
+          make -j$(nproc) LLVM=1 LLVM_IAS=1 O=out ARCH=arm64 SUBARCH=arm64 CC=clang LD=ld.lld CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- KBUILD_BUILD_USER=hylab KBUILD_BUILD_HOST=localhost
+
+      - name: Patch Boot
+        run: |
+          chmod +x ./magiskboot
+          unzip boot.zip
+          cp -rf kernel-source/out/arch/arm64/boot/* .
+          ./magiskboot unpack boot.img
+          rm -rf kernel
+          cp -rf kernel-source/out/arch/arm64/boot/Image ./kernel
+          ./magiskboot repack boot.img
+          rm -rf ramdisk.cpio boot.img
+
+      - name: Zip
+        run:
+          zip -r -9 -o Kernel.zip dtbo.img Image
+
+      - name: Kernel REL
+        uses: actions/upload-artifact@main
         with:
-          name: kernel-build-out
-          path: out.tar.gz
-          retention-days: 7
+          name: ${{ steps.init_config.outputs.processed_name }} KernelSU
+          path: ./Kernel.zip
