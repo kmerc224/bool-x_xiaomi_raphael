@@ -41,7 +41,6 @@ jobs:
           export ARCH=arm64
           export PATH="$HOME/toolchain/clang/bin:$PATH"
           export CROSS_COMPILE=aarch64-linux-gnu-
-          export CROSS_COMPILE=$HOME/toolchains/google_gcc49/bin/aarch64-linux-android- 
           make O=out alioth_user_defconfig
           make O=out -j8
           
